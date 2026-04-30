@@ -40,6 +40,12 @@ public class Board extends JPanel {
                         }
                     }
                     case KeyEvent.VK_DOWN -> moveDownLogic();
+                    case KeyEvent.VK_UP -> {
+                        currentPiece.rotate();
+                        if (!isValidMove(currentPiece.x, currentPiece.y)) {
+                            currentPiece.rotateBack();
+                        }
+                    }
                 }
                 repaint();
             }
@@ -57,7 +63,6 @@ public class Board extends JPanel {
             EndGame.handle(this);
         }
     }
-    }
 
     private void moveDownLogic() {
         if (currentPiece == null) return;
@@ -65,6 +70,7 @@ public class Board extends JPanel {
             currentPiece.moveDown();
         } else {
             lockPiece();
+            LineClearing.clear(boardGrid, ROWS, COLS);
             spawnPiece();
         }
     }
