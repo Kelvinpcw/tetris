@@ -47,7 +47,7 @@ public class Board extends JPanel {
     }
 
     private void spawnPiece() {
-        currentPiece = PieceFactory.getSquare();
+        currentPiece = PieceFactory.getRandomPiece();
         currentPiece.spawn(COLS / 2 - 1, 0);
 
         if (!isValidMove(currentPiece.x, currentPiece.y)) {
@@ -56,6 +56,7 @@ public class Board extends JPanel {
             }
             EndGame.handle(this);
         }
+    }
     }
 
     private void moveDownLogic() {
