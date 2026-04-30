@@ -10,16 +10,18 @@ public class Board extends JPanel {
     private Color[][] boardGrid = new Color[ROWS][COLS];
 
     private Shape currentPiece;
+    private Timer timer;
 
     public Board() {
         setBackground(Color.BLACK);
         setFocusable(true);
-        spawnPiece();
 
-        Timer timer = new Timer(500, e -> {
+        timer = new Timer(500, e -> {
             moveDownLogic();
             repaint();
         });
+
+        spawnPiece();
         timer.start();
 
         addKeyListener(new KeyAdapter() {
@@ -47,6 +49,13 @@ public class Board extends JPanel {
     private void spawnPiece() {
         currentPiece = PieceFactory.getSquare();
         currentPiece.spawn(COLS / 2 - 1, 0);
+
+        if (!isValidMove(currentPiece.x, currentPiece.y)) {
+            if (timer != null) {
+                timer.stop();
+            }
+            EndGame.handle(this);
+        }
     }
 
     private void moveDownLogic() {
