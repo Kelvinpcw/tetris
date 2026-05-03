@@ -27,4 +27,18 @@ public class Shape {
     public void moveDown() {
         this.y++;
     }
+    public void rotate(){
+        for (int[] coord : coordinates) {
+            int temp = coord[0];
+            coord[0] = -coord[1];
+            coord[1] = temp;
+        }
+    }
+    public void rotateBack(){
+        for (int[] coord : coordinates) {
+            int temp = coord[0];
+            coord[0] = coord[1];
+            coord[1] = -temp;
+        }
+    }
 }
