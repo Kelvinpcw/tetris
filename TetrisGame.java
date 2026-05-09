@@ -2,13 +2,15 @@ import javax.swing.JFrame;
 
 public class TetrisGame {
     public static void main(String[] args) {
-        JFrame frame = new JFrame("OOP Tetris MVP");
-        Board board = new Board();
-        
+        GameModel model = new GameModel();
+        Board board = new Board(model);
+        new GameController(model, board);
+
+        JFrame frame = new JFrame("Tetris");
         frame.add(board);
-        frame.setSize(315, 640);
+        frame.pack();
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setVisible(true);
         frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
     }
 }
