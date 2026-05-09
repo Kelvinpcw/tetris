@@ -1,125 +1,104 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
 
 public class Board extends JPanel {
-    private final int TILE_SIZE = 30;
-    private final int ROWS = 20;
-    private final int COLS = 10;
-    private Color[][] boardGrid = new Color[ROWS][COLS];
+    private static final int TILE_SIZE = 30;
+    private static final int PREVIEW_OFFSET_X = GameModel.COLS * TILE_SIZE + 20;
+    private static final int PREVIEW_TILE = 20;
 
-    private Shape currentPiece;
-    private Timer timer;
+    private final GameModel model;
 
-    public Board() {
+    public Board(GameModel model) {
+        this.model = model;
         setBackground(Color.BLACK);
         setFocusable(true);
-
-        timer = new Timer(500, e -> {
-            moveDownLogic();
-            repaint();
-        });
-
-        spawnPiece();
-        timer.start();
-
-        addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (currentPiece == null) return;
-                switch (e.getKeyCode()) {
-                    case KeyEvent.VK_LEFT -> {
-                        if (isValidMove(currentPiece.x - 1, currentPiece.y)) {
-                            currentPiece.moveLeft();
-                        }
-                    }
-                    case KeyEvent.VK_RIGHT -> {
-                        if (isValidMove(currentPiece.x + 1, currentPiece.y)) {
-                            currentPiece.moveRight();
-                        }
-                    }
-                    case KeyEvent.VK_DOWN -> moveDownLogic();
-                    case KeyEvent.VK_UP -> {
-                        currentPiece.rotate();
-                        if (!isValidMove(currentPiece.x, currentPiece.y)) {
-                            currentPiece.rotateBack();
-                        }
-                    }
-                }
-                repaint();
-            }
-        });
-    }
-
-    private void spawnPiece() {
-        currentPiece = PieceFactory.getRandomPiece();
-        currentPiece.spawn(COLS / 2 - 1, 0);
-
-        if (!isValidMove(currentPiece.x, currentPiece.y)) {
-            if (timer != null) {
-                timer.stop();
-            }
-            EndGame.handle(this);
-        }
-    }
-
-    private void moveDownLogic() {
-        if (currentPiece == null) return;
-        if (isValidMove(currentPiece.x, currentPiece.y + 1)) {
-            currentPiece.moveDown();
-        } else {
-            lockPiece();
-            LineClearing.clear(boardGrid, ROWS, COLS);
-            spawnPiece();
-        }
-    }
-
-    private boolean isValidMove(int newX, int newY) {
-        for (int[] relCoord : currentPiece.coordinates) {
-            int x = newX + relCoord[0];
-            int y = newY + relCoord[1];
-
-            if (x < 0 || x >= COLS || y >= ROWS) {
-                return false;
-            }
-            if (y >= 0 && boardGrid[y][x] != null) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void lockPiece() {
-        for (int[] relCoord : currentPiece.coordinates) {
-            int x = currentPiece.x + relCoord[0];
-            int y = currentPiece.y + relCoord[1];
-            if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
-                boardGrid[y][x] = currentPiece.color;
-            }
-        }
+        setPreferredSize(new Dimension(GameModel.COLS * TILE_SIZE + 120, GameModel.ROWS * TILE_SIZE));
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        drawBoard(g);
+        drawCurrentPiece(g);
+        drawSidebar(g);
+    }
 
-        for (int r = 0; r < ROWS; r++) {
-            for (int c = 0; c < COLS; c++) {
-                if (boardGrid[r][c] != null) {
-                    g.setColor(boardGrid[r][c]);
+    private void drawBoard(Graphics g) {
+        Color[][] grid = model.getBoardGrid();
+        for (int r = 0; r < GameModel.ROWS; r++) {
+            for (int c = 0; c < GameModel.COLS; c++) {
+                if (grid[r][c] != null) {
+                    g.setColor(grid[r][c]);
                     g.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1);
                 }
             }
         }
+        g.setColor(Color.DARK_GRAY);
+        for (int r = 0; r <= GameModel.ROWS; r++) {
+            g.drawLine(0, r * TILE_SIZE, GameModel.COLS * TILE_SIZE, r * TILE_SIZE);
+        }
+        for (int c = 0; c <= GameModel.COLS; c++) {
+            g.drawLine(c * TILE_SIZE, 0, c * TILE_SIZE, GameModel.ROWS * TILE_SIZE);
+        }
+    }
 
-        if (currentPiece != null) {
-            g.setColor(currentPiece.color);
-            for (int[] relCoord : currentPiece.coordinates) {
-                int x = (currentPiece.x + relCoord[0]) * TILE_SIZE;
-                int y = (currentPiece.y + relCoord[1]) * TILE_SIZE;
-                g.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+    private void drawCurrentPiece(Graphics g) {
+        Shape piece = model.getCurrentPiece();
+        if (piece == null) return;
+
+        Shape ghost = computeGhost(piece);
+        g.setColor(piece.color.darker().darker());
+        for (int[] rc : ghost.coordinates) {
+            int x = (ghost.x + rc[0]) * TILE_SIZE;
+            int y = (ghost.y + rc[1]) * TILE_SIZE;
+            g.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+        }
+
+        g.setColor(piece.color);
+        for (int[] rc : piece.coordinates) {
+            int x = (piece.x + rc[0]) * TILE_SIZE;
+            int y = (piece.y + rc[1]) * TILE_SIZE;
+            g.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+        }
+    }
+
+    private Shape computeGhost(Shape piece) {
+        Shape ghost = new Shape(copyCoords(piece.coordinates), piece.color);
+        ghost.spawn(piece.x, piece.y);
+        while (model.isValidMove(ghost.x, ghost.y + 1)) {
+            ghost.moveDown();
+        }
+        return ghost;
+    }
+
+    private int[][] copyCoords(int[][] src) {
+        int[][] copy = new int[src.length][2];
+        for (int i = 0; i < src.length; i++) {
+            copy[i][0] = src[i][0];
+            copy[i][1] = src[i][1];
+        }
+        return copy;
+    }
+
+    private void drawSidebar(Graphics g) {
+        int sx = PREVIEW_OFFSET_X;
+
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Monospaced", Font.BOLD, 12));
+        g.drawString("NEXT", sx, 20);
+
+        Shape next = model.getNextPiece();
+        if (next != null) {
+            g.setColor(next.color);
+            for (int[] rc : next.coordinates) {
+                int x = sx + (rc[0] + 2) * PREVIEW_TILE;
+                int y = 30 + (rc[1] + 2) * PREVIEW_TILE;
+                g.fillRect(x, y, PREVIEW_TILE - 1, PREVIEW_TILE - 1);
             }
         }
+
+        g.setColor(Color.WHITE);
+        g.drawString("SCORE", sx, 130);
+        g.drawString(String.valueOf(model.getScore()), sx, 148);
     }
 }
