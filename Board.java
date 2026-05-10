@@ -1,10 +1,19 @@
 import javax.swing.*;
 import java.awt.*;
 
-public class Board extends JPanel {
-    private static final int TILE_SIZE = 30;
+/**
+ * The game's main drawing surface.
+ *
+ * Implements {@link Renderable}: all painting logic lives in {@code render()},
+ * and {@code paintComponent()} simply delegates to it.  This keeps Swing's
+ * override separate from the game's drawing concern, and lets other code
+ * (tests, screenshots) call {@code render()} without going through Swing.
+ */
+public class Board extends JPanel implements Renderable {
+
+    private static final int TILE_SIZE       = 30;
     private static final int PREVIEW_OFFSET_X = GameModel.COLS * TILE_SIZE + 20;
-    private static final int PREVIEW_TILE = 20;
+    private static final int PREVIEW_TILE     = 20;
 
     private final GameModel model;
 
@@ -12,16 +21,29 @@ public class Board extends JPanel {
         this.model = model;
         setBackground(Color.BLACK);
         setFocusable(true);
-        setPreferredSize(new Dimension(GameModel.COLS * TILE_SIZE + 120, GameModel.ROWS * TILE_SIZE));
+        setPreferredSize(new Dimension(
+                GameModel.COLS * TILE_SIZE + 120,
+                GameModel.ROWS * TILE_SIZE));
     }
+
+    // ── Swing override ───────────────────────────────────────────────────────
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        render(g);              // delegate to the Renderable contract
+    }
+
+    // ── Renderable implementation ────────────────────────────────────────────
+
+    @Override
+    public void render(Graphics g) {
         drawBoard(g);
         drawCurrentPiece(g);
         drawSidebar(g);
     }
+
+    // ── private drawing helpers ──────────────────────────────────────────────
 
     private void drawBoard(Graphics g) {
         Color[][] grid = model.getBoardGrid();
@@ -34,66 +56,50 @@ public class Board extends JPanel {
             }
         }
         g.setColor(Color.DARK_GRAY);
-        for (int r = 0; r <= GameModel.ROWS; r++) {
+        for (int r = 0; r <= GameModel.ROWS; r++)
             g.drawLine(0, r * TILE_SIZE, GameModel.COLS * TILE_SIZE, r * TILE_SIZE);
-        }
-        for (int c = 0; c <= GameModel.COLS; c++) {
+        for (int c = 0; c <= GameModel.COLS; c++)
             g.drawLine(c * TILE_SIZE, 0, c * TILE_SIZE, GameModel.ROWS * TILE_SIZE);
-        }
     }
 
     private void drawCurrentPiece(Graphics g) {
         Shape piece = model.getCurrentPiece();
         if (piece == null) return;
 
-        Shape ghost = computeGhost(piece);
-        g.setColor(piece.color.darker().darker());
-        for (int[] rc : ghost.coordinates) {
-            int x = (ghost.x + rc[0]) * TILE_SIZE;
-            int y = (ghost.y + rc[1]) * TILE_SIZE;
-            g.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-        }
-
-        g.setColor(piece.color);
-        for (int[] rc : piece.coordinates) {
-            int x = (piece.x + rc[0]) * TILE_SIZE;
-            int y = (piece.y + rc[1]) * TILE_SIZE;
-            g.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-        }
-    }
-
-    private Shape computeGhost(Shape piece) {
-        Shape ghost = new Shape(copyCoords(piece.coordinates), piece.color);
-        ghost.spawn(piece.x, piece.y);
-        while (model.isValidMove(ghost.x, ghost.y + 1)) {
+        // ghost piece (shows where the piece will land)
+        Shape ghost = new Shape(piece);          // copy constructor
+        while (model.isValidMove(ghost.getX(), ghost.getY() + 1))
             ghost.moveDown();
-        }
-        return ghost;
-    }
 
-    private int[][] copyCoords(int[][] src) {
-        int[][] copy = new int[src.length][2];
-        for (int i = 0; i < src.length; i++) {
-            copy[i][0] = src[i][0];
-            copy[i][1] = src[i][1];
+        g.setColor(piece.getColor().darker().darker());
+        for (int[] rc : ghost.getCoordinates()) {
+            g.fillRect((ghost.getX() + rc[0]) * TILE_SIZE,
+                       (ghost.getY() + rc[1]) * TILE_SIZE,
+                       TILE_SIZE - 1, TILE_SIZE - 1);
         }
-        return copy;
+
+        // actual piece
+        g.setColor(piece.getColor());
+        for (int[] rc : piece.getCoordinates()) {
+            g.fillRect((piece.getX() + rc[0]) * TILE_SIZE,
+                       (piece.getY() + rc[1]) * TILE_SIZE,
+                       TILE_SIZE - 1, TILE_SIZE - 1);
+        }
     }
 
     private void drawSidebar(Graphics g) {
         int sx = PREVIEW_OFFSET_X;
-
         g.setColor(Color.WHITE);
         g.setFont(new Font("Monospaced", Font.BOLD, 12));
         g.drawString("NEXT", sx, 20);
 
         Shape next = model.getNextPiece();
         if (next != null) {
-            g.setColor(next.color);
-            for (int[] rc : next.coordinates) {
-                int x = sx + (rc[0] + 2) * PREVIEW_TILE;
-                int y = 30 + (rc[1] + 2) * PREVIEW_TILE;
-                g.fillRect(x, y, PREVIEW_TILE - 1, PREVIEW_TILE - 1);
+            g.setColor(next.getColor());
+            for (int[] rc : next.getCoordinates()) {
+                g.fillRect(sx + (rc[0] + 2) * PREVIEW_TILE,
+                           30  + (rc[1] + 2) * PREVIEW_TILE,
+                           PREVIEW_TILE - 1, PREVIEW_TILE - 1);
             }
         }
 
